@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="pt-PT">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#000000" />
-  <meta name="description" content="Chat web con asistente de IA" />
-  <title>Chat Web - Asistente IA</title>
+  <meta name="description" content="Chat para consulta do Dicionário de Dados" />
+  <title>Dicionário de Dados - Chat</title>
   
   <!-- React y ReactDOM desde CDN -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -442,12 +442,12 @@
   </style>
 </head>
 <body>
-  <noscript>Necesitas habilitar JavaScript para usar esta aplicación.</noscript>
-  <div id="root">
-    <div style="color: white; padding: 20px; text-align: center;">
-      Cargando...
+  <noscript>É necessário ativar o JavaScript para utilizar esta aplicação.</noscript>
+    <div id="root">
+      <div style="color: white; padding: 20px; text-align: center;">
+        A carregar...
+      </div>
     </div>
-  </div>
 
   <script type="text/babel" data-presets="react">
     const { useState, useRef, useEffect } = React;
@@ -457,19 +457,18 @@
                         window.location.hostname !== '127.0.0.1' &&
                         window.location.protocol !== 'file:';
     
-    // URL del webhook de n8n (directo en producción, proxy local en desarrollo)
-    const N8N_WEBHOOK_URL = 'https://groupegmpi.app.n8n.cloud/webhook/761b05cc-158e-4140-9f11-8be71f4d2f3a';
+    // URL del API: usar proxy de Vercel en producción, servidor local en desarrollo
     const API_URL = isProduction 
-      ? N8N_WEBHOOK_URL  // En producción (Vercel), conectar directamente a n8n
+      ? window.location.origin + '/api/chat'  // Usar API route de Vercel (evita CORS)
       : (window.location.origin === 'null' || window.location.origin === 'file://'
-          ? 'http://localhost:8000/api'  // Servidor local si se abre desde archivo
-          : window.location.origin + '/api');  // Mismo origen si se sirve desde servidor
+          ? 'http://localhost:8000/api/chat'  // Servidor local si se abre desde archivo
+          : window.location.origin + '/api/chat');  // Mismo origen si se sirve desde servidor
 
     // Componente Message
     const Message = ({ message }) => {
       const isUser = message.sender === 'user';
       const formatTime = (date) => {
-        return new Date(date).toLocaleTimeString('es-ES', {
+        return new Date(date).toLocaleTimeString('pt-PT', {
           hour: '2-digit',
           minute: '2-digit'
         });
@@ -480,7 +479,7 @@
         
         return (
           <div className="message-links">
-            <strong>Enlaces:</strong>
+            <strong>Ligações:</strong>
             {links.map((link, index) => (
               <a
                 key={index}
@@ -529,10 +528,9 @@
         <div className="message-list">
           {messages.length === 0 && (
             <div className="empty-state">
-              <div className="empty-icon">🤖</div>
-              <h2>¡Hola! Bienvenido al Chat</h2>
-              <p>Escribe un mensaje para comenzar la conversación.</p>
-              <p className="hint">Puedes recibir documentos y enlaces útiles.</p>
+              <div className="empty-icon">📊</div>
+              <h2>Olá! Bem-vindo ao Dicionário de Dados</h2>
+              <p>Pode fazer perguntas para obter a descrição de termos específicos, solicitar a listagem completa de termos ou pedir o registo de novos termos.</p>
             </div>
           )}
           {messages.map((message) => (
@@ -579,7 +577,7 @@
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Escribe tu mensaje aquí..."
+              placeholder="Escreva a sua pergunta sobre o dicionário de dados..."
               className="message-input"
               disabled={disabled}
             />
@@ -633,10 +631,8 @@
             timestamp: new Date().toISOString()
           };
 
-          // En producción, usar directamente n8n. En desarrollo, usar proxy local
-          let targetUrl = isProduction ? API_URL : (API_URL + '/chat');
-          
-          const response = await axios.post(targetUrl, payload, {
+          // Usar API URL (ya incluye /chat)
+          const response = await axios.post(API_URL, payload, {
             timeout: 30000, // 30 segundos de timeout
             headers: {
               'Content-Type': 'application/json'
@@ -660,7 +656,7 @@
             links = response.data.links || extractLinks(responseText);
             documents = response.data.documents || extractDocumentReferences(responseText);
           } else {
-            responseText = 'Respuesta recibida';
+            responseText = 'Resposta recebida';
           }
 
           if (links.length === 0) {
@@ -683,20 +679,20 @@
           setIsLoading(false);
         } catch (error) {
           console.error('Error al enviar mensaje:', error);
-          let errorText = 'Lo siento, hubo un error al procesar tu mensaje.';
+          let errorText = 'Desculpe, ocorreu um erro ao processar a sua mensagem.';
           
           if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-            errorText = '⚠️ El servidor local no está corriendo.\n\n' +
+            errorText = '⚠️ O servidor local não está em execução.\n\n' +
                        'Por favor:\n' +
-                       '1. Haz doble clic en "servidor_simple.bat"\n' +
-                       '2. O ejecuta: python servidor_simple.py\n' +
-                       '3. Luego recarga esta página';
+                       '1. Faça duplo clique em "servidor_simple.bat"\n' +
+                       '2. Ou execute: python servidor_simple.py\n' +
+                       '3. Depois recarregue esta página';
           } else if (error.code === 'ECONNABORTED') {
-            errorText = 'Tiempo de espera agotado. El webhook de n8n no respondió a tiempo.';
+            errorText = 'Tempo de espera esgotado. O webhook do n8n não respondeu a tempo.';
           } else if (error.response) {
-            errorText = `Error ${error.response.status}: ${error.response.statusText}`;
+            errorText = `Erro ${error.response.status}: ${error.response.statusText}`;
           } else if (error.message) {
-            errorText = `Error: ${error.message}`;
+            errorText = `Erro: ${error.message}`;
           }
 
           const errorMessage = {
@@ -737,9 +733,9 @@
       return (
         <div className="chat-container">
           <div className="chat-header">
-            <h1>💬 Chat Web</h1>
+            <h1>📊 Dicionário de Dados</h1>
             <button onClick={clearChat} className="clear-button">
-              Limpiar Chat
+              Limpar Conversa
             </button>
           </div>
           <MessageList 
@@ -769,13 +765,13 @@
           const root = ReactDOM.createRoot(rootElement);
           root.render(React.createElement(App));
         } catch (error) {
-          console.error('Error al renderizar:', error);
-          rootElement.innerHTML = '<div style="color: white; padding: 20px;">Error: ' + error.message + '</div>';
+          console.error('Erro ao renderizar:', error);
+          rootElement.innerHTML = '<div style="color: white; padding: 20px;">Erro: ' + error.message + '</div>';
         }
       } else {
-        console.error('React no está disponible');
+        console.error('React não está disponível');
         if (rootElement) {
-          rootElement.innerHTML = '<div style="color: white; padding: 20px;">Error: React no se cargó. Verifica la consola.</div>';
+          rootElement.innerHTML = '<div style="color: white; padding: 20px;">Erro: React não foi carregado. Verifique a consola.</div>';
         }
       }
     }
