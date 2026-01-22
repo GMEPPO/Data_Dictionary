@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Chat web con asistente de IA" />
+  <title>Chat Web - Asistente IA</title>
+  
+  <!-- React y ReactDOM desde CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel Standalone para compilar JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Axios para peticiones HTTP -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .App {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 900px;
+      height: 90vh;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat-header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .clear-button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .clear-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .message-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #f5f7fa;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .message-list::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .message-list::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 10px;
+    }
+
+    .message-list::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+
+    .empty-state h2 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .empty-state p {
+      font-size: 16px;
+      line-height: 1.6;
+      margin: 8px 0;
+    }
+
+    .hint {
+      color: #999;
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    .loading-message {
+      display: flex;
+      justify-content: flex-start;
+      padding: 15px 0;
+    }
+
+    .typing-indicator {
+      display: flex;
+      gap: 5px;
+      padding: 12px 18px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .typing-indicator span {
+      height: 8px;
+      width: 8px;
+      background: #667eea;
+      border-radius: 50%;
+      display: inline-block;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+
+    .typing-indicator span:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    @keyframes typing {
+      0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .message {
+      display: flex;
+      margin-bottom: 10px;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message-user {
+      justify-content: flex-end;
+    }
+
+    .message-assistant {
+      justify-content: flex-start;
+    }
+
+    .message-content {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      word-wrap: break-word;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .message-user .message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message-assistant .message-content {
+      background: white;
+      color: #333;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message-text {
+      line-height: 1.5;
+      white-space: pre-wrap;
+      margin-bottom: 8px;
+    }
+
+    .message-links,
+    .message-documents {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .message-user .message-links,
+    .message-user .message-documents {
+      border-top-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .message-links strong,
+    .message-documents strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .message-link {
+      display: block;
+      color: #667eea;
+      text-decoration: none;
+      padding: 6px 10px;
+      margin: 4px 0;
+      background: rgba(102, 126, 234, 0.1);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      word-break: break-all;
+    }
+
+    .message-link:hover {
+      background: rgba(102, 126, 234, 0.2);
+      transform: translateX(3px);
+    }
+
+    .message-user .message-link {
+      color: white;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .message-user .message-link:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .message-document {
+      display: block;
+      padding: 6px 10px;
+      margin: 4px 0;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .message-user .message-document {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+
+    .message-time {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 6px;
+      text-align: right;
+    }
+
+    .message-assistant .message-time {
+      text-align: left;
+    }
+
+    .message-input-container {
+      padding: 20px;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .message-input-form {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .message-input {
+      flex: 1;
+      padding: 12px 18px;
+      border: 2px solid #e0e0e0;
+      border-radius: 25px;
+      font-size: 16px;
+      outline: none;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .message-input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .message-input:disabled {
+      background: #f5f5f5;
+      cursor: not-allowed;
+    }
+
+    .send-button {
+      width: 48px;
+      height: 48px;
+      border: none;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .send-button:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .send-button:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .send-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .send-icon {
+      font-size: 20px;
+      transform: rotate(-90deg);
+    }
+
+    @media (max-width: 768px) {
+      .chat-container {
+        height: 100vh;
+        border-radius: 0;
+      }
+
+      .chat-header {
+        padding: 15px 20px;
+      }
+
+      .chat-header h1 {
+        font-size: 20px;
+      }
+
+      .message-content {
+        max-width: 85%;
+      }
+
+      .message-input-container {
+        padding: 15px;
+      }
+
+      .message-input {
+        font-size: 14px;
+        padding: 10px 15px;
+      }
+
+      .send-button {
+        width: 44px;
+        height: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <noscript>Necesitas habilitar JavaScript para usar esta aplicación.</noscript>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    // Detectar si estamos en producción (Vercel) o desarrollo local
+    const isProduction = window.location.hostname !== 'localhost' && 
+                        window.location.hostname !== '127.0.0.1' &&
+                        window.location.protocol !== 'file:';
+    
+    // URL del webhook de n8n (directo en producción, proxy local en desarrollo)
+    const N8N_WEBHOOK_URL = 'https://groupegmpi.app.n8n.cloud/webhook/761b05cc-158e-4140-9f11-8be71f4d2f3a';
+    const API_URL = isProduction 
+      ? N8N_WEBHOOK_URL  // En producción (Vercel), conectar directamente a n8n
+      : (window.location.origin === 'null' || window.location.origin === 'file://'
+          ? 'http://localhost:8000/api'  // Servidor local si se abre desde archivo
+          : window.location.origin + '/api');  // Mismo origen si se sirve desde servidor
+    
+    const N8N_WEBHOOK_URL = 'https://groupegmpi.app.n8n.cloud/webhook/761b05cc-158e-4140-9f11-8be71f4d2f3a';
+
+    // Componente Message
+    const Message = ({ message }) => {
+      const isUser = message.sender === 'user';
+      const formatTime = (date) => {
+        return new Date(date).toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      };
+
+      const renderLinks = (links) => {
+        if (!links || links.length === 0) return null;
+        
+        return (
+          <div className="message-links">
+            <strong>Enlaces:</strong>
+            {links.map((link, index) => (
+              <a
+                key={index}
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="message-link"
+              >
+                🔗 {link}
+              </a>
+            ))}
+          </div>
+        );
+      };
+
+      const renderDocuments = (documents) => {
+        if (!documents || documents.length === 0) return null;
+        
+        return (
+          <div className="message-documents">
+            <strong>Documentos:</strong>
+            {documents.map((doc, index) => (
+              <div key={index} className="message-document">
+                📄 {doc}
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      return (
+        <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`}>
+          <div className="message-content">
+            <div className="message-text">{message.text}</div>
+            {renderLinks(message.links)}
+            {renderDocuments(message.documents)}
+            <div className="message-time">{formatTime(message.timestamp)}</div>
+          </div>
+        </div>
+      );
+    };
+
+    // Componente MessageList
+    const MessageList = ({ messages, isLoading, messagesEndRef }) => {
+      return (
+        <div className="message-list">
+          {messages.length === 0 && (
+            <div className="empty-state">
+              <div className="empty-icon">🤖</div>
+              <h2>¡Hola! Bienvenido al Chat</h2>
+              <p>Escribe un mensaje para comenzar la conversación.</p>
+              <p className="hint">Puedes recibir documentos y enlaces útiles.</p>
+            </div>
+          )}
+          {messages.map((message) => (
+            <Message key={message.id} message={message} />
+          ))}
+          {isLoading && (
+            <div className="loading-message">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      );
+    };
+
+    // Componente MessageInput
+    const MessageInput = ({ onSendMessage, disabled }) => {
+      const [message, setMessage] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (message.trim() && !disabled) {
+          onSendMessage(message);
+          setMessage('');
+        }
+      };
+
+      const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSubmit(e);
+        }
+      };
+
+      return (
+        <div className="message-input-container">
+          <form onSubmit={handleSubmit} className="message-input-form">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Escribe tu mensaje aquí..."
+              className="message-input"
+              disabled={disabled}
+            />
+            <button
+              type="submit"
+              disabled={disabled || !message.trim()}
+              className="send-button"
+            >
+              <span className="send-icon">➤</span>
+            </button>
+          </form>
+        </div>
+      );
+    };
+
+    // Componente ChatContainer
+    const ChatContainer = () => {
+      const [messages, setMessages] = useState([]);
+      const [isLoading, setIsLoading] = useState(false);
+      const [sessionId] = useState(() => `session-${Date.now()}`);
+      const messagesEndRef = useRef(null);
+
+      const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      };
+
+      useEffect(() => {
+        scrollToBottom();
+      }, [messages]);
+
+      const sendMessage = async (text) => {
+        if (!text.trim() || isLoading) return;
+
+        const userMessage = {
+          id: Date.now(),
+          text: text,
+          sender: 'user',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        setIsLoading(true);
+
+        try {
+          // Enviar mensaje a través del servidor local (evita CORS)
+          const payload = {
+            message: text,
+            sessionId: sessionId,
+            timestamp: new Date().toISOString()
+          };
+
+          // En producción, usar directamente n8n. En desarrollo, usar proxy local
+          let targetUrl = isProduction ? API_URL : (API_URL + '/chat');
+          
+          const response = await axios.post(targetUrl, payload, {
+            timeout: 30000, // 30 segundos de timeout
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          // Procesar respuesta de n8n
+          // n8n puede devolver la respuesta en diferentes formatos
+          let responseText = '';
+          let links = [];
+          let documents = [];
+
+          if (typeof response.data === 'string') {
+            responseText = response.data;
+          } else if (response.data) {
+            // Si es un objeto, buscar el mensaje
+            responseText = response.data.message || 
+                          response.data.response || 
+                          response.data.text ||
+                          response.data.body ||
+                          JSON.stringify(response.data);
+            
+            // Extraer enlaces y documentos si vienen en la respuesta
+            links = response.data.links || extractLinks(responseText);
+            documents = response.data.documents || extractDocumentReferences(responseText);
+          } else {
+            responseText = 'Respuesta recibida';
+          }
+
+          // Extraer enlaces del texto si no vienen en la respuesta
+          if (links.length === 0) {
+            links = extractLinks(responseText);
+          }
+          if (documents.length === 0) {
+            documents = extractDocumentReferences(responseText);
+          }
+
+          const assistantMessage = {
+            id: Date.now() + 1,
+            text: responseText,
+            sender: 'assistant',
+            timestamp: new Date(),
+            links: links,
+            documents: documents
+          };
+
+          setMessages(prev => [...prev, assistantMessage]);
+          setIsLoading(false);
+        } catch (error) {
+          console.error('Error al enviar mensaje:', error);
+          let errorText = 'Lo siento, hubo un error al procesar tu mensaje.';
+          
+          if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+            errorText = '⚠️ El servidor local no está corriendo.\n\n' +
+                       'Por favor:\n' +
+                       '1. Haz doble clic en "servidor_simple.bat"\n' +
+                       '2. O ejecuta: python servidor_simple.py\n' +
+                       '3. Luego recarga esta página';
+          } else if (error.code === 'ECONNABORTED') {
+            errorText = 'Tiempo de espera agotado. El webhook de n8n no respondió a tiempo.';
+          } else if (error.response) {
+            errorText = `Error ${error.response.status}: ${error.response.statusText}`;
+          } else if (error.message) {
+            errorText = `Error: ${error.message}`;
+          }
+
+          const errorMessage = {
+            id: Date.now() + 1,
+            text: errorText,
+            sender: 'assistant',
+            timestamp: new Date(),
+            isError: true
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          setIsLoading(false);
+        }
+      };
+
+      // Función para extraer enlaces del texto
+      const extractLinks = (text) => {
+        if (!text) return [];
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return text.match(urlRegex) || [];
+      };
+
+      // Función para extraer referencias a documentos
+      const extractDocumentReferences = (text) => {
+        if (!text) return [];
+        const docRegex = /(?:documento|archivo|file|descargar|download)[\s:]+([^\s]+\.(pdf|doc|docx|txt|zip|rar))/gi;
+        const matches = [];
+        let match;
+        while ((match = docRegex.exec(text)) !== null) {
+          matches.push(match[1]);
+        }
+        return matches;
+      };
+
+      const clearChat = () => {
+        setMessages([]);
+      };
+
+      return (
+        <div className="chat-container">
+          <div className="chat-header">
+            <h1>💬 Chat Web</h1>
+            <button onClick={clearChat} className="clear-button">
+              Limpiar Chat
+            </button>
+          </div>
+          <MessageList 
+            messages={messages} 
+            isLoading={isLoading}
+            messagesEndRef={messagesEndRef}
+          />
+          <MessageInput onSendMessage={sendMessage} disabled={isLoading} />
+        </div>
+      );
+    };
+
+    // Componente App
+    const App = () => {
+      return (
+        <div className="App">
+          <ChatContainer />
+        </div>
+      );
+    };
+
+    // Renderizar la aplicación
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
