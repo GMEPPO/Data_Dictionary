@@ -28,9 +28,12 @@ export default async function handler(req, res) {
     let usedUrl = null;
     
     // Tentar cada URL
-    for (const url of urlsToTry) {
+    for (let i = 0; i < urlsToTry.length; i++) {
+      const url = urlsToTry[i];
+      const isTestUrl = url.includes('webhook-test');
+      
       try {
-        console.log('Tentando conectar com:', url);
+        console.log(`[Tentativa ${i + 1}/${urlsToTry.length}] Tentando conectar com:`, url);
         console.log('Payload:', JSON.stringify(req.body));
         
         response = await fetch(url, {
@@ -39,30 +42,65 @@ export default async function handler(req, res) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(req.body),
+          timeout: 30000, // 30 segundos
         });
+        
+        console.log(`Resposta recebida de ${isTestUrl ? 'TEST' : 'PRODUCTION'}: Status ${response.status}`);
         
         // Se a resposta for OK, usar esta URL
         if (response.ok) {
           usedUrl = url;
-          console.log('Sucesso com URL:', url);
+          console.log(`✅ Sucesso com URL ${isTestUrl ? 'TEST' : 'PRODUCTION'}:`, url);
           break;
         }
         
-        // Se for 404, tentar próxima URL
-        if (response.status === 404) {
-          console.log('URL não encontrada (404), tentando próxima...');
+        // Ler o texto da resposta para diagnóstico
+        const errorText = await response.text();
+        console.log(`❌ Erro ${response.status} com ${isTestUrl ? 'TEST' : 'PRODUCTION'}:`, errorText.substring(0, 200));
+        
+        // Se for 404 ou "not registered", tentar próxima URL
+        if (response.status === 404 || 
+            errorText.includes('not registered') || 
+            errorText.includes('não está registrado') ||
+            errorText.includes('is not registered')) {
+          console.log(`⚠️ Webhook não registrado em ${isTestUrl ? 'TEST' : 'PRODUCTION'}, tentando próxima URL...`);
+          lastError = { 
+            status: response.status, 
+            message: errorText,
+            url: isTestUrl ? 'TEST' : 'PRODUCTION'
+          };
+          
+          // Se é a última URL, não continuar
+          if (i === urlsToTry.length - 1) {
+            break;
+          }
           continue;
         }
         
-        // Outros erros, tentar próxima URL também
-        const errorText = await response.text();
-        console.log(`Erro ${response.status} com ${url}, tentando próxima...`);
-        lastError = { status: response.status, message: errorText };
+        // Outros erros HTTP, tentar próxima URL também
+        lastError = { 
+          status: response.status, 
+          message: errorText,
+          url: isTestUrl ? 'TEST' : 'PRODUCTION'
+        };
+        
+        // Se é a última URL, não continuar
+        if (i === urlsToTry.length - 1) {
+          break;
+        }
         continue;
         
       } catch (fetchError) {
-        console.error('Erro de rede com', url, ':', fetchError.message);
-        lastError = fetchError;
+        console.error(`❌ Erro de rede com ${isTestUrl ? 'TEST' : 'PRODUCTION'}:`, fetchError.message);
+        lastError = { 
+          error: fetchError.message,
+          url: isTestUrl ? 'TEST' : 'PRODUCTION'
+        };
+        
+        // Se é a última URL, não continuar
+        if (i === urlsToTry.length - 1) {
+          break;
+        }
         // Continuar para próxima URL
         continue;
       }
@@ -70,9 +108,21 @@ export default async function handler(req, res) {
     
     // Se nenhuma URL funcionou
     if (!response || !response.ok) {
-      console.error('Todas as URLs falharam. Último erro:', lastError);
+      console.error('❌ Todas as URLs falharam. Último erro:', lastError);
+      
+      const errorDetails = [];
+      if (lastError?.url) {
+        errorDetails.push(`Última tentativa: ${lastError.url}`);
+      }
+      if (lastError?.status) {
+        errorDetails.push(`Status: ${lastError.status}`);
+      }
+      if (lastError?.message) {
+        errorDetails.push(`Mensagem: ${lastError.message.substring(0, 100)}`);
+      }
+      
       return res.status(200).json({
-        message: 'Erro de conexão com o n8n. Tentei tanto a URL de produção quanto a de teste.\n\nVerifique:\n1. Se o workflow está ativo no n8n\n2. Se o método HTTP do webhook é POST\n3. Se as URLs estão corretas',
+        message: `Erro de conexão com o n8n.\n\nTentei ambas as URLs (produção e teste) mas nenhuma funcionou.\n\n${errorDetails.join('\n')}\n\nVerifique:\n1. Se o workflow está ATIVO no n8n\n2. Se o método HTTP do webhook é POST (não GET)\n3. Se está usando a URL correta (Production ou Test)\n4. Se o webhook está configurado corretamente`,
         links: [],
         documents: []
       });
@@ -80,9 +130,10 @@ export default async function handler(req, res) {
 
     // Obtener respuesta
     const data = await response.text();
-    console.log('Status do n8n:', response.status);
-    console.log('URL usada:', usedUrl);
-    console.log('Resposta do n8n:', data.substring(0, 200));
+    const urlType = usedUrl?.includes('webhook-test') ? 'TEST' : 'PRODUCTION';
+    console.log(`✅ Status do n8n (${urlType}):`, response.status);
+    console.log(`✅ URL usada (${urlType}):`, usedUrl);
+    console.log('✅ Resposta do n8n:', data.substring(0, 200));
 
     // Verificar si la respuesta es OK
     if (!response.ok) {
