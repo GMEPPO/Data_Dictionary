@@ -16,25 +16,63 @@ export default async function handler(req, res) {
   }
 
   try {
-    const N8N_WEBHOOK_URL = 'https://groupegmpi.app.n8n.cloud/webhook/761b05cc-158e-4140-9f11-8be71f4d2f3a';
+    // URLs do webhook: produção e teste
+    const N8N_WEBHOOK_PRODUCTION = 'https://groupegmpi.app.n8n.cloud/webhook/761b05cc-158e-4140-9f11-8be71f4d2f3a';
+    const N8N_WEBHOOK_TEST = 'https://groupegmpi.app.n8n.cloud/webhook-test/761b05cc-158e-4140-9f11-8be71f4d2f3a';
     
-    console.log('Enviando para n8n:', N8N_WEBHOOK_URL);
-    console.log('Payload:', JSON.stringify(req.body));
+    // Tentar primeiro com produção, depois com teste
+    const urlsToTry = [N8N_WEBHOOK_PRODUCTION, N8N_WEBHOOK_TEST];
     
-    // Enviar petición a n8n
     let response;
-    try {
-      response = await fetch(N8N_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(req.body),
-      });
-    } catch (fetchError) {
-      console.error('Erro de rede ao conectar com n8n:', fetchError);
+    let lastError = null;
+    let usedUrl = null;
+    
+    // Tentar cada URL
+    for (const url of urlsToTry) {
+      try {
+        console.log('Tentando conectar com:', url);
+        console.log('Payload:', JSON.stringify(req.body));
+        
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(req.body),
+        });
+        
+        // Se a resposta for OK, usar esta URL
+        if (response.ok) {
+          usedUrl = url;
+          console.log('Sucesso com URL:', url);
+          break;
+        }
+        
+        // Se for 404, tentar próxima URL
+        if (response.status === 404) {
+          console.log('URL não encontrada (404), tentando próxima...');
+          continue;
+        }
+        
+        // Outros erros, tentar próxima URL também
+        const errorText = await response.text();
+        console.log(`Erro ${response.status} com ${url}, tentando próxima...`);
+        lastError = { status: response.status, message: errorText };
+        continue;
+        
+      } catch (fetchError) {
+        console.error('Erro de rede com', url, ':', fetchError.message);
+        lastError = fetchError;
+        // Continuar para próxima URL
+        continue;
+      }
+    }
+    
+    // Se nenhuma URL funcionou
+    if (!response || !response.ok) {
+      console.error('Todas as URLs falharam. Último erro:', lastError);
       return res.status(200).json({
-        message: 'Erro de conexão com o n8n. Verifique se o workflow está ativo e se a URL do webhook está correta.',
+        message: 'Erro de conexão com o n8n. Tentei tanto a URL de produção quanto a de teste.\n\nVerifique:\n1. Se o workflow está ativo no n8n\n2. Se o método HTTP do webhook é POST\n3. Se as URLs estão corretas',
         links: [],
         documents: []
       });
@@ -43,6 +81,7 @@ export default async function handler(req, res) {
     // Obtener respuesta
     const data = await response.text();
     console.log('Status do n8n:', response.status);
+    console.log('URL usada:', usedUrl);
     console.log('Resposta do n8n:', data.substring(0, 200));
 
     // Verificar si la respuesta es OK
