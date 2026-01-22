@@ -757,16 +757,26 @@
       );
     };
 
-    // Renderizar cuando todo esté listo
+    // Renderizar cuando todo esté listo (solo una vez)
+    let rootInstance = null;
+    let isRendered = false;
+
     function initApp() {
+      if (isRendered) return; // Evitar múltiples renderizados
+      
       const rootElement = document.getElementById('root');
       if (rootElement && window.React && window.ReactDOM) {
         try {
-          const root = ReactDOM.createRoot(rootElement);
-          root.render(React.createElement(App));
+          if (!rootInstance) {
+            rootInstance = ReactDOM.createRoot(rootElement);
+            isRendered = true;
+          }
+          rootInstance.render(React.createElement(App));
         } catch (error) {
           console.error('Erro ao renderizar:', error);
-          rootElement.innerHTML = '<div style="color: white; padding: 20px;">Erro: ' + error.message + '</div>';
+          if (rootElement) {
+            rootElement.innerHTML = '<div style="color: white; padding: 20px;">Erro: ' + error.message + '</div>';
+          }
         }
       } else {
         console.error('React não está disponível');
@@ -776,18 +786,15 @@
       }
     }
 
-    // Intentar renderizar cuando el DOM esté listo
+    // Intentar renderizar cuando el DOM esté listo (solo una vez)
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initApp);
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initApp, 100);
+      });
     } else {
       // Si ya está cargado, esperar un poco para que Babel compile
       setTimeout(initApp, 100);
     }
-
-    // También intentar cuando la ventana cargue completamente
-    window.addEventListener('load', () => {
-      setTimeout(initApp, 200);
-    });
   </script>
 </body>
 </html>

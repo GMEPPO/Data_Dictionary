@@ -27,6 +27,28 @@ export default async function handler(req, res) {
       body: JSON.stringify(req.body),
     });
 
+    // Verificar si la respuesta es OK
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Erro do n8n:', response.status, errorText);
+      
+      // Se o webhook não está registrado, retornar mensagem amigável
+      if (response.status === 404 || errorText.includes('not registered')) {
+        return res.status(200).json({
+          message: 'O webhook do n8n não está registrado ou o workflow não está ativo. Por favor, verifique se o workflow está ativo no n8n.',
+          links: [],
+          documents: []
+        });
+      }
+      
+      return res.status(response.status).json({
+        error: 'Erro ao conectar com n8n',
+        message: errorText || `Erro ${response.status}`,
+        links: [],
+        documents: []
+      });
+    }
+
     // Obtener respuesta
     const data = await response.text();
     
