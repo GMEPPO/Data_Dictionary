@@ -494,14 +494,16 @@
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const foundLinks = text.match(urlRegex) || [];
         
-        // Remover enlaces del texto
+        // Remover enlaces del texto pero preservar TODOS los saltos de línea y espacios
         let cleanText = text;
         foundLinks.forEach(link => {
-          cleanText = cleanText.replace(link, '').trim();
+          // Reemplazar solo el enlace, mantener todo lo demás (saltos de línea, espacios, etc.)
+          cleanText = cleanText.replace(link, '');
         });
         
-        // Limpiar espacios múltiples
-        cleanText = cleanText.replace(/\s+/g, ' ').trim();
+        // NO limpiar espacios ni saltos de línea - preservar el formato original
+        // Solo eliminar espacios múltiples al inicio y final del texto completo
+        cleanText = cleanText.trim();
         
         return { cleanText, links: foundLinks };
       };
