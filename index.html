@@ -673,7 +673,7 @@
 
           // Usar API URL (ya incluye /chat)
           const response = await axios.post(API_URL, payload, {
-            timeout: 30000, // 30 segundos de timeout
+            timeout: 300000, // 5 minutos de timeout (300 segundos)
             headers: {
               'Content-Type': 'application/json'
             }
@@ -727,8 +727,8 @@
                        '1. Faça duplo clique em "servidor_simple.bat"\n' +
                        '2. Ou execute: python servidor_simple.py\n' +
                        '3. Depois recarregue esta página';
-          } else if (error.code === 'ECONNABORTED') {
-            errorText = 'Tempo de espera esgotado. O webhook do n8n não respondeu a tempo.';
+          } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+            errorText = '⏱️ Tempo de espera esgotado.\n\nO n8n não respondeu em 5 minutos.\n\nPossíveis causas:\n1. O workflow está processando uma tarefa muito demorada\n2. O n8n está sobrecarregado\n3. Problemas de rede\n\nPor favor, tente novamente em alguns instantes.';
           } else if (error.response) {
             errorText = `Erro ${error.response.status}: ${error.response.statusText}`;
           } else if (error.message) {

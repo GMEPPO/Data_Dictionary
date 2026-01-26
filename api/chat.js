@@ -36,13 +36,20 @@ export default async function handler(req, res) {
         console.log(`[Tentativa ${i + 1}/${urlsToTry.length}] Tentando conectar com:`, url);
         console.log('Payload:', JSON.stringify(req.body));
         
+        // Crear AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutos (300 segundos)
+        
         response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(req.body),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log(`Resposta recebida de ${isTestUrl ? 'TEST' : 'PRODUCTION'}: Status ${response.status}`);
         
@@ -90,6 +97,20 @@ export default async function handler(req, res) {
         continue;
         
       } catch (fetchError) {
+        // Verificar si es timeout
+        if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
+          console.error(`⏱️ Timeout ao conectar com ${isTestUrl ? 'TEST' : 'PRODUCTION'}`);
+          lastError = { 
+            error: 'Timeout - n8n não respondeu em 5 minutos',
+            url: isTestUrl ? 'TEST' : 'PRODUCTION',
+            isTimeout: true
+          };
+          if (i === urlsToTry.length - 1) {
+            break;
+          }
+          continue;
+        }
+        
         console.error(`❌ Erro de rede com ${isTestUrl ? 'TEST' : 'PRODUCTION'}:`, fetchError.message);
         lastError = { 
           error: fetchError.message,
@@ -118,6 +139,15 @@ export default async function handler(req, res) {
       }
       if (lastError?.message) {
         errorDetails.push(`Mensagem: ${lastError.message.substring(0, 100)}`);
+      }
+      
+      // Mensaje especial para timeout
+      if (lastError?.isTimeout) {
+        return res.status(200).json({
+          message: `⏱️ Timeout: O n8n não respondeu em 5 minutos.\n\nTentei ambas as URLs (produção e teste) mas nenhuma respondeu a tempo.\n\nPossíveis causas:\n1. O workflow do n8n está processando uma tarefa muito demorada\n2. O n8n está sobrecarregado\n3. Problemas de rede\n\nPor favor, tente novamente em alguns instantes.`,
+          links: [],
+          documents: []
+        });
       }
       
       return res.status(200).json({
